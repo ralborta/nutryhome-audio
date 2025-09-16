@@ -20,7 +20,11 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://nutry-home-btvkllfm-nu41-vercel-app.vercel.app",
+        "https://*.vercel.app",
+        "http://localhost:3000"
+    ],
     allow_credentials=False,
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
