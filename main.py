@@ -66,13 +66,16 @@ async def get_audio(conversation_id: str):
     """
     start_time = datetime.now()
     
-    logger.info(f"Audio request para: {conversation_id}")
+    logger.info(f"🎵 Audio request para: {conversation_id}")
+    logger.info(f"⏰ Timestamp: {start_time.isoformat()}")
     
     # Validaciones básicas
     if not ELEVENLABS_API_KEY:
+        logger.error("❌ ELEVENLABS_API_KEY no configurada")
         raise HTTPException(status_code=500, detail="API key no configurada")
     
     if not conversation_id or len(conversation_id) < 5:
+        logger.warning(f"⚠️ Conversation ID inválido: {conversation_id}")
         raise HTTPException(status_code=400, detail="ID de conversación inválido")
     
     try:
@@ -86,15 +89,18 @@ async def get_audio(conversation_id: str):
                 }
             )
             
-            logger.info(f"ElevenLabs response: {response.status_code}")
+            logger.info(f"🔗 ElevenLabs response: {response.status_code}")
+            logger.info(f"📊 Response headers: {dict(response.headers)}")
             
             # Manejo de errores
             if response.status_code == 404:
+                logger.warning(f"❌ Audio no disponible para: {conversation_id}")
                 raise HTTPException(
                     status_code=404, 
                     detail=f"Audio no disponible para {conversation_id}"
                 )
             elif response.status_code != 200:
+                logger.error(f"❌ Error ElevenLabs: {response.status_code}")
                 raise HTTPException(
                     status_code=502,
                     detail=f"Error ElevenLabs: {response.status_code}"
@@ -112,17 +118,23 @@ async def get_audio(conversation_id: str):
             content_length = response.headers.get("content-length")
             if content_length:
                 headers["Content-Length"] = content_length
-                logger.info(f"Audio size: {content_length} bytes")
+                logger.info(f"📏 Audio size: {content_length} bytes")
+            
+            logger.info(f"🚀 Iniciando stream de audio para: {conversation_id}")
             
             # Streaming generator
             async def stream_audio():
                 total_bytes = 0
+                chunk_count = 0
                 async for chunk in response.aiter_bytes(chunk_size=8192):
                     total_bytes += len(chunk)
+                    chunk_count += 1
+                    if chunk_count % 10 == 0:  # Log cada 10 chunks
+                        logger.info(f"📦 Chunk {chunk_count}: {len(chunk)} bytes (total: {total_bytes})")
                     yield chunk
                 
                 duration = (datetime.now() - start_time).total_seconds()
-                logger.info(f"Stream completed: {total_bytes} bytes in {duration:.2f}s")
+                logger.info(f"✅ Stream completed: {total_bytes} bytes en {chunk_count} chunks en {duration:.2f}s")
             
             return StreamingResponse(
                 stream_audio(),
@@ -131,12 +143,13 @@ async def get_audio(conversation_id: str):
             )
             
     except httpx.TimeoutException:
+        logger.error(f"⏰ Timeout conectando con ElevenLabs para: {conversation_id}")
         raise HTTPException(status_code=504, detail="Timeout conectando con ElevenLabs")
     except httpx.RequestError as e:
-        logger.error(f"Connection error: {e}")
+        logger.error(f"🔌 Connection error para {conversation_id}: {e}")
         raise HTTPException(status_code=502, detail=f"Error de conectividad: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"💥 Unexpected error para {conversation_id}: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # Middleware para logging
